@@ -7,7 +7,19 @@ const db = require('./db');
 //Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
 
-//MOCK = DONNEE DE TEST
+function query(request, data) {
+    return new Promise((resolve, reject) => {
+        db.query(request, (data || []), (error, result) => {
+            if (error) {
+                reject(error);
+            } else {
+                resolve(result);
+            }
+        });
+    });
+}
+
+/*//MOCK = DONNEE DE TEST
 const cars = [
     { id: 1, brand: 'Peugeot', model: 508 },
     { id: 2, brand: 'Audi', model: 'A4' },
@@ -15,17 +27,15 @@ const cars = [
     { id: 4, brand: 'Opel', model: 'Astra' },
     { id: 5, brand: 'Toyota', model: 'Yaris' }
 ];
-
+*/
 // Récuperer les voitures 
-app.get('/api/cars', function (req, res) {
-
-    db.query('Select * from car', function (error, result) {
-        if (error) {
-            return res.status(404).json({ error: 'Impossible to get cars.' });
-        }
-
-        res.json(result);
-    });
+app.get('/api/cars', async (req, res) => {
+    try {
+        const cars = await query('Select * from car');
+        res.json(cars);
+    } catch (e) {
+        res.status(400).json({ error: 'Impossible to get cars' });
+    }
 });
 
 //Récuperer une voiture
@@ -35,21 +45,51 @@ app.get('/api/cars/:id', function (req, res) {
     /*const id = parseInt(req.params.id, 10);
     console.log(id);*/
     const id = req.params.id;
-    // Chercher un élément dans le tableau (find)
-    const car = cars.find(function (car) {
-        return car.id == id;
+
+    db.query('Select * from car where id = ?', [id], function (error, result) {
+        if (error) {
+            return res.status(400).json({ error: 'Impossible to get the current car.' });
+        }
+
+        const car = result.shift();
+
+        if (car) {
+            return res.json(car);
+        }
+
+        res.status(404).json({ error: 'Car not found !' });
     });
-    if (car != undefined) {
-        res.json(car);
-    } else {
-        res.status(404).json({ Error: 'Car not found !' });
-    }
+
+
+    /* // Chercher un élément dans le tableau (find)
+     const car = cars.find(function (car) {
+         return car.id == id;
+     });
+     if (car != undefined) {
+         res.json(car);
+     } else {
+         res.status(404).json({ Error: 'Car not found !' });
+     }*/
 });
 
 // Supprimer une voiture
 app.delete('/api/cars/:id', function (req, res) {
     const id = req.params.id;
-    const index = cars.findIndex(function (car) {
+
+    // db.query('delete from car where id = ?', [id], function(error, result){
+    db.query('delete from car where id = ?', [id], (error, result) => {
+        if (error) {
+            return res.status(400).json({ error: 'Impossible to remove the current car.' });
+        }
+
+        if (result.affectedRows > 0) {
+            return res.status(204).send();
+        }
+
+        return res.status(404).json({ error: 'Car not found ! ' });
+    });
+
+    /*const index = cars.findIndex(function (car) {
         return car.id == id;
     });
     if (index === -1) {
@@ -57,13 +97,36 @@ app.delete('/api/cars/:id', function (req, res) {
     } else {
         cars.splice(index, 1);
         res.status(204).send();
-    }
+    }*/
 });
 
 // Créer une voiture
 app.post('/api/cars', function (req, res) {
-    const data = req.body;  // Recupératio des données
-    const newId = cars.reduce(function (acc, c) {
+    const data = req.body;  // Recupération des données
+
+    db.query('Insert into car (brand, model) values (?, ?)', [data.brand, data.model], (error, result) => {
+        if (error) {
+            return res.status(400).json({ error: 'Impossible to save the car.' });
+        }
+
+        const id = result.insertId;
+
+        db.query('Select * from car where id = ?', [id], function (error, result) {
+            if (error) {
+                return res.status(400).json({ error: 'Impossible to get the car.' });
+            }
+
+            const car = result.shift();
+
+            if (car) {
+                return res.json(car);
+            }
+
+            res.status(404).json({ error: 'Car not found !' });
+        });
+    });
+
+    /*const newId = cars.reduce(function (acc, c) {
         // opérateur ternaire
         // Recherche de l'id le plus haut, +1
         acc = acc < c.id ? c.id : acc;
@@ -73,6 +136,7 @@ app.post('/api/cars', function (req, res) {
     cars.push(data); // ajout dans la fin du tableau
 
     res.json(data);
+    */
 });
 
 //Modification voiture
