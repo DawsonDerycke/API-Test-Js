@@ -1,11 +1,16 @@
 const express = require('express');
 const app = express();
-const port = 3000;
+const cors = require('cors');
 const bodyParser = require('body-parser');
+
 const db = require('./db');
 
 //Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
+
+app.use(cors());
+
+const port = 3000;
 
 function query(request, data) {
     return new Promise((resolve, reject) => {
